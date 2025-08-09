@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "332556439035",
+    "project_id": "hakgulsdiary",
+    "storage_bucket": "hakgulsdiary.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:332556439035:android:c32c8573c610003d7d0f5e",
+        "android_client_info": {
+          "package_name": "com.example.hakgulsdaily"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCr45-7_CuOzFW-aUHfALyOkZvQWSWM5og"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
