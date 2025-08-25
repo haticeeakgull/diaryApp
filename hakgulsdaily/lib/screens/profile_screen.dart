@@ -17,6 +17,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
   final _firestore = FirebaseFirestore.instance;
   final _storage = FirebaseStorage.instance;
   final TextEditingController _usernameController = TextEditingController();
+  final TextEditingController _emailController = TextEditingController();
+  final TextEditingController _passwordController = TextEditingController();
   String? _profilePhotoUrl;
   File? _selectedImage;
   bool _isLoading = false;
@@ -38,6 +40,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           if (data != null) {
             _usernameController.text = data['username'] ?? '';
             _profilePhotoUrl = data['photoUrl'];
+            _emailController.text = user.email ?? ''; // Mevcut e-postayı doldur
             setState(() {});
           }
         }
@@ -61,7 +64,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
   // Profil bilgilerini ve fotoğrafı kaydetme
   Future<void> _saveProfile() async {
     final user = _auth.currentUser;
-    if (user == null) return;
+    if (user == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Lütfen giriş yapın.')),
+      );
+      return;
+    }
 
     setState(() {
       _isLoading = true;
@@ -75,8 +83,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
         final storageRef = _storage.ref().child('user_profile_photos').child(user.uid);
         await storageRef.putFile(_selectedImage!);
         newPhotoUrl = await storageRef.getDownloadURL();
+      } on FirebaseException catch (e) {
+        print('DEBUG: Firebase profil fotoğrafı yüklenirken hata oluştu: ${e.code}');
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Firebase hatası: ${e.message}')),
+        );
+        setState(() {
+          _isLoading = false;
+        });
+        return;
       } catch (e) {
-        print('DEBUG: Profil fotoğrafı yüklenirken hata oluştu: $e');
+        print('DEBUG: Profil bilgileri yüklenirken hata oluştu: $e');
         // Hata durumunda yüklemeyi iptal et
         setState(() {
           _isLoading = false;
@@ -89,38 +106,83 @@ class _ProfileScreenState extends State<ProfileScreen> {
     try {
       await _firestore.collection('users').doc(user.uid).set({
         'username': _usernameController.text,
-        'email': user.email,
+        'email': _emailController.text, // E-posta adresini de kaydediyoruz
         'photoUrl': newPhotoUrl,
       }, SetOptions(merge: true));
       _profilePhotoUrl = newPhotoUrl;
+    } on FirebaseException catch (e) {
+      print('DEBUG: Firebase profil bilgileri kaydedilirken hata oluştu: ${e.code}');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Firebase hatası: ${e.message}')),
+      );
     } catch (e) {
       print('DEBUG: Profil bilgileri kaydedilirken hata oluştu: $e');
+    }
+
+    // E-posta ve şifre güncelleme işlemleri
+    try {
+      // Sadece e-posta değiştiyse güncelle
+      if (_emailController.text.isNotEmpty && user.email != _emailController.text) {
+        await user.updateEmail(_emailController.text);
+      }
+      
+      // Sadece şifre alanı doluysa güncelle
+      if (_passwordController.text.isNotEmpty) {
+        await user.updatePassword(_passwordController.text);
+      }
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Profil başarıyla güncellendi!')),
+        );
+      }
+
+    } on FirebaseAuthException catch (e) {
+      String errorMessage;
+      if (e.code == 'requires-recent-login') {
+        errorMessage = 'Bu işlemi yapmak için yakın zamanda tekrar giriş yapmanız gerekiyor.';
+      } else {
+        errorMessage = 'Kimlik doğrulama hatası: ${e.message}';
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(errorMessage)),
+      );
+    } catch (e) {
+      print('DEBUG: E-posta veya şifre güncellenirken hata oluştu: $e');
     }
 
     setState(() {
       _isLoading = false;
     });
-
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Profil başarıyla güncellendi!')),
-      );
-    }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      resizeToAvoidBottomInset: false, // Klavye açıldığında taşma sorununu engeller
       appBar: AppBar(
         title: const Text('Profilim'),
         elevation: 0,
+        backgroundColor: Colors.transparent,
       ),
-      body: SingleChildScrollView(
+      extendBodyBehindAppBar: true,
+      body: Container(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [
+              Color.fromRGBO(219, 239, 247, 1),
+              Color.fromRGBO(251, 216, 216, 1),
+            ],
+          ),
+        ),
         child: Padding(
           padding: const EdgeInsets.all(16.0),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
+              const SizedBox(height: 50),
               GestureDetector(
                 onTap: _pickImage,
                 child: Center(
@@ -165,6 +227,30 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 ),
               ),
               const SizedBox(height: 20),
+              TextField(
+                controller: _emailController,
+                keyboardType: TextInputType.emailAddress,
+                decoration: InputDecoration(
+                  labelText: 'E-posta',
+                  prefixIcon: const Icon(Icons.email),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 20),
+              TextField(
+                controller: _passwordController,
+                obscureText: true,
+                decoration: InputDecoration(
+                  labelText: 'Yeni Şifre (Değiştirmek için doldurun)',
+                  prefixIcon: const Icon(Icons.lock),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 20),
               ElevatedButton(
                 onPressed: _isLoading ? null : _saveProfile,
                 style: ElevatedButton.styleFrom(
@@ -181,6 +267,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         style: TextStyle(fontSize: 18, color: Colors.white),
                       ),
               ),
+              const Spacer(),
             ],
           ),
         ),
