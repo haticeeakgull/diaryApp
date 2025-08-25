@@ -12,13 +12,14 @@ Future<void> main() async {
   // Flutter'ın widget bağlama işlemini başlatıyoruz. Bu her zaman ilk satır olmalı.
   WidgetsFlutterBinding.ensureInitialized();
   
+  await dotenv.load(fileName: ".env");
   // Önce Firebase'i başlatın. Bu, diğer tüm servislerin doğru çalışması için kritik.
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
   
   // Şimdi ortam değişkenlerini (API anahtarı vb.) yükleyebilirsiniz.
-  await dotenv.load(fileName: ".env");
+  
 
   // Uygulamayı başlatıyoruz.
   runApp(const MyApp());
